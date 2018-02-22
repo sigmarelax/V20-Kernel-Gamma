@@ -543,7 +543,6 @@ struct dwc3_ep_events {
  * @dbg_ep_events: different events counter for endpoint
  * @dbg_ep_events_diff: differential events counter for endpoint
  * @dbg_ep_events_ts: timestamp for previous event counters
- * @fifo_depth: allocated TXFIFO depth
  */
 struct dwc3_ep {
 	struct usb_ep		endpoint;
@@ -586,7 +585,6 @@ struct dwc3_ep {
 	struct dwc3_ep_events	dbg_ep_events;
 	struct dwc3_ep_events	dbg_ep_events_diff;
 	struct timespec		dbg_ep_events_ts;
-	int			fifo_depth;
 };
 
 enum dwc3_phy {
@@ -753,6 +751,10 @@ struct dwc3_scratchpad_array {
 #define DWC3_CONTROLLER_RESTART_USB_SESSION		11
 #define DWC3_CONTROLLER_NOTIFY_DISABLE_UPDXFER		12
 
+#ifdef CONFIG_LGE_USB_MAXIM_EVP
+#define DWC3_EVP_CONNECT_EVENT				255
+#endif
+
 #define MAX_INTR_STATS					10
 /**
  * struct dwc3 - representation of our controller
@@ -818,6 +820,7 @@ struct dwc3_scratchpad_array {
  * @is_selfpowered: true when we are selfpowered
  * @needs_fifo_resize: not all users might want fifo resizing, flag it
  * @pullups_connected: true when Run/Stop bit is set
+ * @resize_fifos: tells us it's ok to reconfigure our TxFIFO sizes.
  * @setup_packet_pending: true when there's a Setup Packet in FIFO. Workaround
  * @start_config_issued: true when StartConfig command has been issued
  * @three_stage_setup: set if we perform a three phase setup
@@ -835,7 +838,6 @@ struct dwc3_scratchpad_array {
  * @wait_linkstate: waitqueue for waiting LINK to move into required state
  * @vbus_draw: current to be drawn from USB
  * @dwc_ipc_log_ctxt: dwc3 ipa log context
- * @last_fifo_depth: total TXFIFO depth of all enabled USB IN/INT endpoints
  */
 struct dwc3 {
 	struct usb_ctrlrequest	*ctrl_req;
@@ -883,7 +885,6 @@ struct dwc3 {
 	u32			num_event_buffers;
 	u32			num_normal_event_buffers;
 	u32			num_gsi_event_buffers;
-	u32			core_id;
 
 	u32			u1;
 	u32			u1u2;
@@ -948,6 +949,7 @@ struct dwc3 {
 	unsigned		is_selfpowered:1;
 	unsigned		needs_fifo_resize:1;
 	unsigned		pullups_connected:1;
+	unsigned		resize_fifos:1;
 	unsigned		setup_packet_pending:1;
 	unsigned		three_stage_setup:1;
 	unsigned		is_drd:1;
@@ -974,22 +976,25 @@ struct dwc3 {
 
 	/* IRQ timing statistics */
 	int			irq;
+	struct tasklet_struct	bh;
 	unsigned long		irq_cnt;
 	unsigned long		ep_cmd_timeout_cnt;
 	unsigned                bh_completion_time[MAX_INTR_STATS];
 	unsigned                bh_handled_evt_cnt[MAX_INTR_STATS];
 	unsigned                bh_dbg_index;
+#ifdef CONFIG_LGE_USB_MAXIM_EVP
+	struct delayed_work	dcp_check_work;
+	unsigned int		evp_usbctrl_err_cnt;
+	bool evp_connect;
+#endif
 	ktime_t			irq_start_time[MAX_INTR_STATS];
 	ktime_t			t_pwr_evt_irq;
 	unsigned                irq_completion_time[MAX_INTR_STATS];
 	unsigned                irq_event_count[MAX_INTR_STATS];
 	unsigned                irq_dbg_index;
 
-	unsigned long		l1_remote_wakeup_cnt;
-
 	wait_queue_head_t	wait_linkstate;
 	void			*dwc_ipc_log_ctxt;
-	int			last_fifo_depth;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -1139,7 +1144,7 @@ struct dwc3_gadget_ep_cmd_params {
 
 /* prototypes */
 void dwc3_set_mode(struct dwc3 *dwc, u32 mode);
-int dwc3_gadget_resize_tx_fifos(struct dwc3 *dwc, struct dwc3_ep *dep);
+int dwc3_gadget_resize_tx_fifos(struct dwc3 *dwc);
 
 #if IS_ENABLED(CONFIG_USB_DWC3_HOST) || IS_ENABLED(CONFIG_USB_DWC3_DUAL_ROLE)
 int dwc3_host_init(struct dwc3 *dwc);
@@ -1154,6 +1159,9 @@ static inline void dwc3_host_exit(struct dwc3 *dwc)
 #if IS_ENABLED(CONFIG_USB_DWC3_GADGET) || IS_ENABLED(CONFIG_USB_DWC3_DUAL_ROLE)
 int dwc3_gadget_init(struct dwc3 *dwc);
 void dwc3_gadget_exit(struct dwc3 *dwc);
+#ifdef CONFIG_LGE_USB_MAXIM_EVP
+void dwc_dcp_check_work(struct work_struct *w);
+#endif
 void dwc3_gadget_restart(struct dwc3 *dwc);
 int dwc3_gadget_set_test_mode(struct dwc3 *dwc, int mode);
 int dwc3_gadget_get_link_state(struct dwc3 *dwc);

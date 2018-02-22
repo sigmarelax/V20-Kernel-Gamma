@@ -903,4 +903,6 @@ config WCD_DSP_GLINK
 
 source "drivers/soc/qcom/memshare/Kconfig"
 
+source "drivers/soc/qcom/lge/Kconfig"
+
 endif # ARCH_MSM

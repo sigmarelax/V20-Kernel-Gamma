@@ -703,7 +703,6 @@ static void dwc3_core_exit_mode(struct dwc3 *dwc)
 void dwc3_post_host_reset_core_init(struct dwc3 *dwc)
 {
 	dwc3_core_init(dwc);
-	dwc3_event_buffers_setup(dwc);
 	dwc3_gadget_restart(dwc);
 	dwc3_notify_event(dwc, DWC3_CONTROLLER_POST_INITIALIZATION_EVENT, 0);
 }
@@ -783,7 +782,6 @@ static int dwc3_probe(struct platform_device *pdev)
 	u8			lpm_nyet_threshold;
 	u8			hird_threshold;
 	u32			num_evt_buffs;
-	u32			core_id;
 	int			irq;
 
 	int			ret;
@@ -897,11 +895,6 @@ static int dwc3_probe(struct platform_device *pdev)
 		if (!ret)
 			dwc->num_gsi_event_buffers = num_evt_buffs;
 
-		ret = of_property_read_u32(node,
-				"qcom,usb-core-id", &core_id);
-		if (!ret)
-			dwc->core_id = core_id;
-
 		if (dwc->enable_bus_suspend) {
 			pm_runtime_set_autosuspend_delay(dev, 500);
 			pm_runtime_use_autosuspend(dev);
@@ -989,6 +982,14 @@ static int dwc3_probe(struct platform_device *pdev)
 			goto err_gadget_exit;
 		}
 	}
+
+#ifdef CONFIG_LGE_USB_MAXIM_EVP
+	if (dwc->dr_mode == USB_DR_MODE_OTG ||
+		dwc->dr_mode ==  USB_DR_MODE_PERIPHERAL) {
+		INIT_DELAYED_WORK(&dwc->dcp_check_work, dwc_dcp_check_work);
+	}
+#endif
+
 	dwc3_notify_event(dwc, DWC3_CONTROLLER_POST_INITIALIZATION_EVENT, 0);
 
 	return 0;
@@ -1014,6 +1015,9 @@ static int dwc3_remove(struct platform_device *pdev)
 	dwc3_event_buffers_cleanup(dwc);
 	dwc3_free_event_buffers(dwc);
 
+#ifdef CONFIG_LGE_USB_MAXIM_EVP
+	cancel_delayed_work_sync(&dwc->dcp_check_work);
+#endif
 	phy_power_off(dwc->usb2_generic_phy);
 	phy_power_off(dwc->usb3_generic_phy);
 
