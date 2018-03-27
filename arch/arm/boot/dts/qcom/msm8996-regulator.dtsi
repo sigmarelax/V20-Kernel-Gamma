@@ -1980,11 +1980,11 @@
 				qcom,cpr-fuse-combos = <8>;
 				qcom,cpr-corners = <8>;
 
-				qcom,cpr-corner-fmax-map = <2 4 6 8>;
+				qcom,cpr-corner-fmax-map = <1 3 5 8>;
 
 				qcom,cpr-voltage-ceiling =
-					<400000  670000  670000  745000  825000
-					 905000  960000 1015000>;
+					<400000  620000  640000  700000  800000
+					 860000  920000 980000>;
 				qcom,cpr-voltage-floor =
 					<400000  520000  520000  520000  520000
 					 520000  520000  520000>;
